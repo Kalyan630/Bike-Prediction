@@ -4,6 +4,11 @@ import numpy as np
 import pandas as pd
 import os
 
+st.set_page_config(
+    page_title="Bike Demand Prediction",
+    layout="wide"
+)
+
 # --- Custom CSS for better UI ---
 st.markdown("""
     <style>
@@ -14,6 +19,37 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ------------------ SIDEBAR NAVIGATION ------------------
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["🚲 Bike Demand Prediction", "📊 EDA Profile Report"]
+)
+
+# ======================================================
+# 📊 EDA PROFILE REPORT PAGE
+# ======================================================
+if page == "📊 EDA Profile Report":
+    st.title("📊 Bike Dataset – EDA Profile Report")
+
+    html_file = "profile.html"
+
+    if os.path.exists(html_file):
+        with open(html_file, "r", encoding="utf-8") as f:
+            source_code = f.read()
+
+        components.html(
+            source_code,
+            height=1200,
+            scrolling=True
+        )
+    else:
+        st.error("❌ profile.html not found. Please add it to the project root.")
+
+    st.markdown("---")
+    st.info("This report was generated using **YData Profiling**.")
+    st.stop()
+    
 # --- Load the trained model ---
 MODEL_PATH = 'best_model.pkl'
 if not os.path.exists(MODEL_PATH):
