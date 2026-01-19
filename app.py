@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import joblib
 import pandas as pd
 import os
@@ -7,85 +6,107 @@ import os
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
-st.set_page_config("Bike Demand Prediction", layout="wide")
-
-if "page" not in st.session_state:
-    st.session_state.page = "🚲 Bike Demand Prediction"
-
-# --------------------------------------------------
-# SIDEBAR NAVIGATION (FIXED)
-# --------------------------------------------------
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Go to",
-    ["🚲 Bike Demand Prediction", "📊 EDA Profile Report", "📈 Prediction Result"],
-    key="page"
+st.set_page_config(
+    page_title="Bike Demand Prediction",
+    layout="wide"
 )
 
 # --------------------------------------------------
-# EDA PAGE
+# SESSION STATE
 # --------------------------------------------------
-if page == "📊 EDA Profile Report":
-    st.title("📊 Bike Dataset – EDA Profile Report")
-
-    if os.path.exists("profile.html"):
-        with open("profile.html", "r", encoding="utf-8") as f:
-            components.html(f.read(), height=1200, scrolling=True)
-    else:
-        st.error("profile.html not found")
-
-    st.stop()
-
-# --------------------------------------------------
-# RESULT PAGE
-# --------------------------------------------------
-if page == "📈 Prediction Result":
-    st.title("📈 Prediction Result")
-
-    if "prediction" not in st.session_state:
-        st.warning("No prediction yet.")
-    else:
-        st.success(f"🚲 Predicted Bike Demand: {st.session_state.prediction:.0f}")
-        st.dataframe(st.session_state.input_data)
-
-    if st.button("🔙 Back"):
-        st.session_state.page = "🚲 Bike Demand Prediction"
-        st.rerun()
-
-    st.stop()
+if "view" not in st.session_state:
+    st.session_state.view = "input"
 
 # --------------------------------------------------
 # LOAD MODEL
 # --------------------------------------------------
-model = joblib.load("best_model.pkl")
-feature_names = model.feature_names_in_
+MODEL_PATH = "best_model.pkl"
 
-# --------------------------------------------------
-# MAIN PAGE
-# --------------------------------------------------
-st.title("🚲 Bike Demand Prediction")
+if not os.path.exists(MODEL_PATH):
+    st.error("Model file not found")
+    st.stop()
+
+model = joblib.load(MODEL_PATH)
+
+try:
+    feature_names = model.feature_names_in_
+except:
+    feature_names = model.named_steps["preprocessor"].feature_names_in_
 
 SEASON_MAP = {"Spring": 1, "Summer": 2, "Fall": 3, "Winter": 4}
 
-season = st.selectbox("Season", list(SEASON_MAP.keys()))
-year = st.selectbox("Year", [2011, 2012])
-hour = st.slider("Hour", 0, 23, 12)
-atemp = st.slider("Feels Like Temp", 0.0, 1.0, 0.5)
+# ==================================================
+# 📈 RESULT PAGE
+# ==================================================
+if st.session_state.view == "result":
+    st.title("📈 Bike Demand Prediction Result")
 
+    st.success(f"🚲 **Predicted Bike Demand:** {st.session_state.prediction:.0f}")
+
+    st.subheader("🔍 Input Details")
+    st.dataframe(st.session_state.pretty_input, use_container_width=True)
+
+    if st.button("🔙 Back to Prediction"):
+        st.session_state.view = "input"
+        st.rerun()
+
+    st.stop()
+
+# ==================================================
+# 🚲 INPUT PAGE
+# ==================================================
+st.title("🚲 Bike Demand Prediction")
+
+st.write("Enter details and click **Predict** to view results on a new page.")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    season = st.selectbox("Season", list(SEASON_MAP.keys()))
+    year = st.selectbox("Year", [2011, 2012])
+    month = st.slider("Month", 1, 12, 6)
+    day = st.slider("Day", 1, 31, 1)
+    hour = st.slider("Hour", 0, 23, 12)
+
+with col2:
+    atemp = st.slider("Feels Like Temperature", 0.0, 1.0, 0.5)
+    windspeed = st.slider("Windspeed", 0.0, 1.0, 0.5)
+    holiday = st.selectbox("Holiday", [0, 1])
+    workingday = st.selectbox("Working Day", [0, 1])
+    is_weekend = st.selectbox("Weekend", [0, 1])
+
+# --------------------------------------------------
+# BUILD INPUT ROW
+# --------------------------------------------------
 row = {f: 0 for f in feature_names}
+
 row["season"] = SEASON_MAP[season]
 row["yr"] = 1 if year == 2012 else 0
+row["mnth"] = month
+row["day"] = day
 row["hr"] = hour
 row["atemp"] = atemp
+row["windspeed"] = windspeed
+row["holiday"] = holiday
+row["workingday"] = workingday
+row["is_weekend"] = is_weekend
 
-df = pd.DataFrame([row])[feature_names]
+input_df = pd.DataFrame([row])[feature_names]
 
-st.dataframe(df)
+pretty_df = input_df.copy()
+pretty_df.columns = [c.replace("_", " ").title() for c in pretty_df.columns]
 
+st.subheader("Selected Inputs")
+st.dataframe(pretty_df, use_container_width=True)
+
+# --------------------------------------------------
+# PREDICT BUTTON
+# --------------------------------------------------
 if st.button("Predict"):
-    pred = model.predict(df)[0]
+    prediction = model.predict(input_df)[0]
 
-    st.session_state.prediction = pred
-    st.session_state.input_data = df
-    st.session_state.page = "📈 Prediction Result"
+    st.session_state.prediction = prediction
+    st.session_state.pretty_input = pretty_df
+    st.session_state.view = "result"
+
     st.rerun()
